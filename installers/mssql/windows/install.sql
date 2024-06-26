@@ -59,6 +59,8 @@ SET @DatabaseName = CONCAT('[', @DatabaseName, ']');
 
 ----------------------------------------------------------------------------------------------------
 
+SET NOCOUNT ON;
+
 PRINT CONCAT('Installing from ''', @PackageRepo, '''');
 PRINT CONCAT('Fetching repository definition from ''', @PackageRepo, '''');
 
@@ -744,8 +746,12 @@ WHILE @@FETCH_STATUS = 0 BEGIN
     
     /* Execute the remote source of the install file */
     PRINT CONCAT('Executing install file ', @filePath);
+    PRINT REPLICATE('-', 100);
+    
     EXEC sp_executesql
         @installFileSource;
+    
+    PRINT REPLICATE('-', 100);
 
     FETCH NEXT FROM
         installFileCursor
