@@ -54,9 +54,6 @@ DECLARE
         @InstallBranch
     );
 
-/* Escape the name of the database to install to */
-SET @DatabaseName = CONCAT('[', @DatabaseName, ']');
-
 ----------------------------------------------------------------------------------------------------
 
 SET NOCOUNT ON;
@@ -85,7 +82,7 @@ DECLARE @queryHttpGet NVARCHAR(MAX) = '
 
     PRINT CONCAT(''HTTP GET '', @targetUrl);
 
-    /* instantiate a new request object */
+    /* Instantiate a new request object */
     EXEC @hresult = sp_OACreate
         ''MSXML2.ServerXMLHTTP'',
         @xmlHttpObject OUTPUT;
@@ -103,7 +100,7 @@ DECLARE @queryHttpGet NVARCHAR(MAX) = '
         GOTO RequestError;
     END
 
-    /* construct/send an HTTP GET request */
+    /* Construct/send an HTTP GET request */
     EXEC @hresult = sp_OAMethod
         @xmlHttpObject,
         ''open'',
@@ -125,13 +122,13 @@ DECLARE @queryHttpGet NVARCHAR(MAX) = '
         GOTO RequestError;
     END
 
-    /* construct/send an HTTP GET request */
+    /* Set headers for the request */
     EXEC @hresult = sp_OAMethod
         @xmlHttpObject,
         ''setRequestHeader'',
         NULL,
         ''Cache-Control'',
-        ''max-age=0'';
+        ''no-cache'';
     IF @hresult != 0 BEGIN
         SET @errorNumber = 99920;
         SET @errorMessage = CONCAT(
@@ -148,11 +145,31 @@ DECLARE @queryHttpGet NVARCHAR(MAX) = '
 
     EXEC @hresult = sp_OAMethod
         @xmlHttpObject,
+        ''setRequestHeader'',
+        NULL,
+        ''Pragma'',
+        ''no-cache'';
+    IF @hresult != 0 BEGIN
+        SET @errorNumber = 99930;
+        SET @errorMessage = CONCAT(
+            ''Unable to set Pragma header for request: Error '',
+            CONVERT(
+                NVARCHAR(MAX),
+                CAST(@hresult AS VARBINARY(8)),
+                1
+            )
+        );
+
+        GOTO RequestError;
+    END
+
+    EXEC @hresult = sp_OAMethod
+        @xmlHttpObject,
         ''send'',
         NULL,
         '''';
     IF @hresult != 0 BEGIN
-        SET @errorNumber = 99930;
+        SET @errorNumber = 99940;
         SET @errorMessage = CONCAT(
             ''Unable to send request: Error '',
             CONVERT(
@@ -180,7 +197,7 @@ DECLARE @queryHttpGet NVARCHAR(MAX) = '
         ''status'',
         @statusCode OUT;
     IF @hresult != 0 BEGIN
-        SET @errorNumber = 99940;
+        SET @errorNumber = 99950;
         SET @errorMessage = CONCAT(
             ''Unable to get response status code: Error '',
             CONVERT(
@@ -193,7 +210,7 @@ DECLARE @queryHttpGet NVARCHAR(MAX) = '
         GOTO RequestError;
     END
     IF @statusCode NOT BETWEEN 200 AND 299 BEGIN
-        SET @errorNumber = 99950;
+        SET @errorNumber = 99960;
         SET @errorMessage = CONCAT(
             ''Server responded with error status code '',
             @statusCode
@@ -213,7 +230,7 @@ DECLARE @queryHttpGet NVARCHAR(MAX) = '
         ''responseText'';
 
     IF @hresult != 0 BEGIN
-        SET @errorNumber = 99960;
+        SET @errorNumber = 99970;
         SET @errorMessage = CONCAT(
             ''Unable to get response: Error '',
             CONVERT(
@@ -230,7 +247,7 @@ DECLARE @queryHttpGet NVARCHAR(MAX) = '
     EXEC @hresult = sp_OADestroy
         @xmlHttpObject;
     IF @hresult != 0 BEGIN
-        SET @errorNumber = 99970;
+        SET @errorNumber = 99980;
         SET @errorMessage = CONCAT(
             ''Unable to destroy MSXML.ServerXMLHTTP object: Error '',
             CONVERT(
@@ -657,11 +674,13 @@ PRINT CONCAT(
 
 /* Get the value for the database parameter */
 DECLARE
-    @databaseParamMethod    NVARCHAR(200),
-    @databaseParamValue     NVARCHAR(200);
+    @databaseParamMethod            NVARCHAR(200),
+    @databaseParamEscapedValue      NVARCHAR(200),
+    @databaseParamUnescapedValue    NVARCHAR(200);
 SELECT
     @databaseParamMethod = [method],
-    @databaseParamValue = [value]
+    @databaseParamEscapedValue = [escapedValue],
+    @databaseParamUnescapedValue = [unescapedValue]
 FROM (
     SELECT
         FieldName = [key],
@@ -678,7 +697,8 @@ PIVOT (
         [FieldName]
     IN (
         [method],
-        [value]
+        [escapedValue],
+        [unescapedValue]
     )
 ) AS _;
 
@@ -740,8 +760,13 @@ WHILE @@FETCH_STATUS = 0 BEGIN
     /* Perform substitution for the database name */
     SET @installFileSource = REPLACE(
         @installFileSource,
-        @databaseParamValue,
+        @databaseParamUnescapedValue,
         @DatabaseName
+    );
+    SET @installFileSource = REPLACE(
+        @installFileSource,
+        @databaseParamEscapedValue,
+        CONCAT('[', REPLACE(@DatabaseName, ']', ']]'), ']')
     );
     
     /* Execute the remote source of the install file */
