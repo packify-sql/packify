@@ -165,11 +165,31 @@ DECLARE @queryHttpGet NVARCHAR(MAX) = '
 
     EXEC @hresult = sp_OAMethod
         @xmlHttpObject,
+        ''setRequestHeader'',
+        NULL,
+        ''User-Agent'',
+        ''packify-install/0.2.0'';
+    IF @hresult != 0 BEGIN
+        SET @errorNumber = 99940;
+        SET @errorMessage = CONCAT(
+            ''Unable to set User-Agent header for request: Error '',
+            CONVERT(
+                NVARCHAR(MAX),
+                CAST(@hresult AS VARBINARY(8)),
+                1
+            )
+        );
+
+        GOTO RequestError;
+    END
+
+    EXEC @hresult = sp_OAMethod
+        @xmlHttpObject,
         ''send'',
         NULL,
         '''';
     IF @hresult != 0 BEGIN
-        SET @errorNumber = 99940;
+        SET @errorNumber = 99950;
         SET @errorMessage = CONCAT(
             ''Unable to send request: Error '',
             CONVERT(
@@ -197,7 +217,7 @@ DECLARE @queryHttpGet NVARCHAR(MAX) = '
         ''status'',
         @statusCode OUT;
     IF @hresult != 0 BEGIN
-        SET @errorNumber = 99950;
+        SET @errorNumber = 99960;
         SET @errorMessage = CONCAT(
             ''Unable to get response status code: Error '',
             CONVERT(
@@ -210,7 +230,7 @@ DECLARE @queryHttpGet NVARCHAR(MAX) = '
         GOTO RequestError;
     END
     IF @statusCode NOT BETWEEN 200 AND 299 BEGIN
-        SET @errorNumber = 99960;
+        SET @errorNumber = 99970;
         SET @errorMessage = CONCAT(
             ''Server responded with error status code '',
             @statusCode
@@ -230,7 +250,7 @@ DECLARE @queryHttpGet NVARCHAR(MAX) = '
         ''responseText'';
 
     IF @hresult != 0 BEGIN
-        SET @errorNumber = 99970;
+        SET @errorNumber = 99980;
         SET @errorMessage = CONCAT(
             ''Unable to get response: Error '',
             CONVERT(
@@ -247,7 +267,7 @@ DECLARE @queryHttpGet NVARCHAR(MAX) = '
     EXEC @hresult = sp_OADestroy
         @xmlHttpObject;
     IF @hresult != 0 BEGIN
-        SET @errorNumber = 99980;
+        SET @errorNumber = 99990;
         SET @errorMessage = CONCAT(
             ''Unable to destroy MSXML.ServerXMLHTTP object: Error '',
             CONVERT(
@@ -788,7 +808,11 @@ END
 CLOSE installFileCursor;
 DEALLOCATE installFileCursor;
 
-PRINT 'Installation complete!';
+PRINT CONCAT(
+    'Installation complete! ',
+    @TargetPackage, ' ', @targetVersion,
+    ' was installed.'
+);
 
 RETURN;
 
