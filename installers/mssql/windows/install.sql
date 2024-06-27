@@ -57,16 +57,20 @@ DECLARE
 ----------------------------------------------------------------------------------------------------
 
 SET NOCOUNT ON;
+SET XACT_ABORT ON;
 
 PRINT CONCAT('Installing from ''', @PackageRepo, '''');
 PRINT CONCAT('Fetching repository definition from ''', @PackageRepo, '''');
 
 DECLARE
-    @objHandle      INT,
-    @hResult        INT,
-    
-    @errorNumber    INT,
-    @errorMessage   NVARCHAR(400);
+    @objHandle          INT,
+    @hResult            INT,
+
+    @errorNumber        INT,
+    @errorMessage       NVARCHAR(400),
+    @originalDatabase   NVARCHAR(MAX) = CONCAT(
+        '[', REPLACE(DB_NAME(), ']', ']]'), ']'
+    );
 
 /* Dynamic query for issuing HTTP GET requests */
 DECLARE @queryHttpGet NVARCHAR(MAX) = '
@@ -793,8 +797,24 @@ WHILE @@FETCH_STATUS = 0 BEGIN
     PRINT CONCAT('Executing install file ', @filePath);
     PRINT REPLICATE('-', 100);
     
-    EXEC sp_executesql
-        @installFileSource;
+    BEGIN TRY
+        EXEC sp_executesql
+            @installFileSource;
+    END TRY
+    BEGIN CATCH
+        /* If an error occurs during installation, ensure any security
+            context is reverted and switch back to the original database
+            context this script was run from */
+        SET @dynamicQuery = CONCAT(
+            'USE ', @originalDatabase, ';'
+        );
+        REVERT;
+        EXEC sp_executesql
+            @dynamicQuery;
+        
+        /* Rethrow the error */
+        THROW;
+    END CATCH
     
     PRINT REPLICATE('-', 100);
 
