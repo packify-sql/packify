@@ -6,7 +6,7 @@
  * 
  * Authors: Will Hinson
  * Created: 2024-06-22
- * Updated: 2024-06-26
+ * Updated: 2024-06-28
  *
  */
 
@@ -44,7 +44,7 @@ DECLARE
         ),
         '/repository.json'
     ),
-    @RepositoryListingURL   NVARCHAR(2000) = REPLACE(
+    @RepositoryListingURL   NVARCHAR(2000)  = REPLACE(
         REPLACE(
             @RepoListingURLFormat,
             ':repo',
@@ -52,6 +52,11 @@ DECLARE
         ),
         ':branch',
         @InstallBranch
+    ),
+    @DatabaseNameEscaped    NVARCHAR(200)   = CONCAT(
+        '[',
+        REPLACE(@DatabaseName, ']', ']]'),
+        ']'
     );
 
 ----------------------------------------------------------------------------------------------------
@@ -790,7 +795,7 @@ WHILE @@FETCH_STATUS = 0 BEGIN
     SET @installFileSource = REPLACE(
         @installFileSource,
         @databaseParamEscapedValue,
-        CONCAT('[', REPLACE(@DatabaseName, ']', ']]'), ']')
+        @DatabaseNameEscaped
     );
     
     /* Execute the remote source of the install file */
@@ -807,8 +812,10 @@ WHILE @@FETCH_STATUS = 0 BEGIN
             context this script was run from */
         BEGIN TRY
             SET @dynamicQuery = CONCAT(
-                'USE ', @databaseParamEscapedValue, ';'
+                'USE ', @DatabaseNameEscaped, ';'
             );
+            EXEC sp_executesql
+                @dynamicQuery;
 
             REVERT;
         END TRY
