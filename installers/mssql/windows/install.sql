@@ -806,6 +806,10 @@ WHILE @@FETCH_STATUS = 0 BEGIN
             context is reverted and switch back to the original database
             context this script was run from */
         BEGIN TRY
+            SET @dynamicQuery = CONCAT(
+                'USE ', @databaseParamEscapedValue, ';'
+            );
+
             REVERT;
         END TRY
         BEGIN CATCH
@@ -817,7 +821,7 @@ WHILE @@FETCH_STATUS = 0 BEGIN
                 ')'
             );
         END CATCH
-        
+
         SET @dynamicQuery = CONCAT(
             'USE ', @originalDatabase, ';'
         );
