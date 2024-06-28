@@ -811,11 +811,21 @@ WHILE @@FETCH_STATUS = 0 BEGIN
             context is reverted and switch back to the original database
             context this script was run from */
         BEGIN TRY
-            SET @dynamicQuery = CONCAT(
-                'USE ', @DatabaseNameEscaped, ';'
-            );
-            EXEC sp_executesql
-                @dynamicQuery;
+            /* Switch over to the target database to revert if it exists */
+            IF EXISTS (
+                SELECT
+                    *
+                FROM
+                    sys.databases
+                WHERE
+                    [name] = @DatabaseName
+            ) BEGIN
+                SET @dynamicQuery = CONCAT(
+                    'USE ', @DatabaseNameEscaped, ';'
+                );
+                EXEC sp_executesql
+                    @dynamicQuery;
+            END
 
             REVERT;
         END TRY
