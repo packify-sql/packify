@@ -805,10 +805,22 @@ WHILE @@FETCH_STATUS = 0 BEGIN
         /* If an error occurs during installation, ensure any security
             context is reverted and switch back to the original database
             context this script was run from */
+        BEGIN TRY
+            REVERT;
+        END TRY
+        BEGIN CATCH
+            PRINT CONCAT(
+                'WARN: Unable to revert to original database/security context (',
+                ERROR_MESSAGE(),
+                ') (',
+                ERROR_NUMBER(),
+                ')'
+            );
+        END CATCH
+        
         SET @dynamicQuery = CONCAT(
             'USE ', @originalDatabase, ';'
         );
-        REVERT;
         EXEC sp_executesql
             @dynamicQuery;
         
