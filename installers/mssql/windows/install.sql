@@ -821,13 +821,12 @@ WHILE @@FETCH_STATUS = 0 BEGIN
                     [name] = @DatabaseName
             ) BEGIN
                 SET @dynamicQuery = CONCAT(
-                    'USE ', @DatabaseNameEscaped, ';'
+                    'USE ', @DatabaseNameEscaped, ';
+                    REVERT;'
                 );
                 EXEC sp_executesql
                     @dynamicQuery;
             END
-
-            REVERT;
         END TRY
         BEGIN CATCH
             PRINT CONCAT(
